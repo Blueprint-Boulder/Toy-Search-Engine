@@ -11,4 +11,8 @@ brew install mysql-client
 
 # Linux (yum)
 yum install mysql
+
+#How To get Yum On WSL
+sudo apt update -y
+sudo apt install -y yum-utils
 ```
