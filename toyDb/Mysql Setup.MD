@@ -1,4 +1,4 @@
-### Generate Local Database
+### SETUP
 
 When the app runs locally it is configured to use the database configuration defined in the `.env` file. The configuration should be a local database so the production database is not affected during development.
 
@@ -12,7 +12,6 @@ brew install mysql-client
 # Linux (yum)
 yum install mysql
 
-#How To get Yum On WSL
-sudo apt update -y
-sudo apt install -y yum-utils
+# Then run this to get Requirements.txt:
+pip install -r requirements.txt
 ```
