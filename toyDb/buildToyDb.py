@@ -68,14 +68,32 @@ def get_family_id(cursor, family_name, scientific_family_name=None, subfamily_na
 def insert_butterfly(connection, butterfly_data):
     cursor = connection.cursor()
 
-    # Extract family names and subfamily name
+    #Insert family data
+    insertFamily_query = """
+    INSERT INTO Families (
+        family_name, scientific_family_name, subfamily_name
+    )
+    VALUES (%s, %s, %s)
+    """
+
+     # Extract family names and subfamily name
     family_name = butterfly_data.get('family_name')
     scientific_family_name = butterfly_data.get('scientific_family_name')
     subfamily_name = butterfly_data.get('subfamily_name')
+
+    cursor.execute(insertFamily_query, (
+        butterfly_data.get('family_name'),
+        butterfly_data.get('scientific_family_name'),
+        butterfly_data.get('subfamily_name')
+    ))
+
+    connection.commit()
     
     family_id = get_family_id(cursor, family_name, scientific_family_name, subfamily_name)
     if not family_id:
         raise ValueError("The provided family/subfamily does not exist in the Families table.")
+
+    print("Butterfly Family data inserted successfully!")
 
     # Insert butterfly data
     insert_query = """
@@ -97,6 +115,8 @@ def insert_butterfly(connection, butterfly_data):
         butterfly_data.get('larval_foodplant'),
         butterfly_data.get('additional_info')
     ))
+
+    
 
     connection.commit()
     print("Butterfly data inserted successfully!")
