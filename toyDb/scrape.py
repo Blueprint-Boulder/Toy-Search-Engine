@@ -2,12 +2,18 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import pandas as pd
 
+#PREPROCESSSING------------------------------------------------------------------------------------------------------------------------------
 def split_name_from_scientific_name(full_name):
     parts = full_name.split(" (")
     name = parts[0]
     scientific_name = parts[1].rstrip(")") if len(parts) > 1 else ""
     return name, scientific_name
 
+def remove_pipe_bar(text):
+    # Split by pipe, get the first part (before pipe) and strip any leading/trailing whitespace
+    return text.split("|")[0].strip()
+
+#--------------------------------------------------------------------------------------------------------------------------------------------
 def get_family_subfamily_joint():
     driver = webdriver.Chrome()
     url = "https://coloradofrontrangebutterflies.com/butterfly-families"
@@ -63,4 +69,64 @@ def get_family_subfamily_joint():
     print("\nFamily to Subfamily Mapping:")
     print(mapping_df)
 
-get_family_subfamily_joint()
+    return subfamilies_df
+
+    
+
+#this will aquire all the base information for the butterfly and create a subfamily to buttefly data frame
+def get_base_butterfly(subfamilies_df):
+    # Initialize a new Chrome WebDriver instance
+    driver = webdriver.Chrome()
+
+    # Go to the target URL
+    url = "http://coloradofrontrangebutterflies.com/butterfly-families/"
+    driver.get(url)
+
+    butterfly_names = []
+    subfamily_ids = []
+
+    # Iterate over the range for all the subfamilies (from 2 to 18 inclusive)
+    for i in range(2, 19):
+        try:
+            # Find the container that includes the butterfly information
+            container = driver.find_element(By.CLASS_NAME, f"et_pb_section_{i}et_section_regular")
+
+            # Extract butterflies
+            inner_texts = container.find_elements(By.CLASS_NAME, "et_pb_text_inner")
+            for inner_text in inner_texts:
+                name = remove_pipe_bar(inner_text.text)
+                butterfly_names.append(name)
+                
+                # Get the subfamily ID based on index (i-2 because range starts from 2)
+                subfamily_id = subfamilies_df.iloc[i-2]['Subfamily ID']
+                subfamily_ids.append(subfamily_id)
+
+        except Exception as e:
+            print(f"Error while processing subfamily index {i}: {e}")
+    
+    driver.quit()
+
+    # Create DataFrame for the base butterfly information
+    butterflies_df = pd.DataFrame({
+        'Butterfly Name': butterfly_names,
+        'Subfamily ID': subfamily_ids
+    })
+
+    # Create the many-to-many joint table
+    joint_df = butterflies_df[['Subfamily ID', 'Butterfly Name']]
+
+    return butterflies_df, joint_df
+
+
+
+
+
+
+
+subfamilies_df = get_family_subfamily_joint()
+butterflies_df, joint_df = get_base_butterfly(subfamilies_df)
+print("Butterflies Data:")
+print(butterflies_df)
+
+print("\nJoint Table Data:")
+print(joint_df)
