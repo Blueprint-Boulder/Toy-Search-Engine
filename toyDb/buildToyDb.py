@@ -1,7 +1,12 @@
 import mysql.connector
+import pandas as pd
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 import os
+import time
 
+#DATABSE CREATION---------------------------------------------------------------------------------------------------------------------------
 # Load environment variables
 load_dotenv()
 
@@ -48,9 +53,14 @@ def create_tables(connection):
 
     print("Tables created successfully!")
     cursor.close()
+#-------------------------------------------------------------------------------------------------------------------------------------------
 
+
+
+#WEB-SCRAPING-------------------------------------------------------------------------------------------------------------------------------
 
 def get_family_id(cursor, family_name, scientific_family_name=None, subfamily_name=None):
+
     if subfamily_name:
         cursor.execute(
             "SELECT family_id FROM Families WHERE family_name = %s AND scientific_family_name = %s AND subfamily_name = %s", 
@@ -64,6 +74,10 @@ def get_family_id(cursor, family_name, scientific_family_name=None, subfamily_na
 
     result = cursor.fetchone()
     return result[0] if result else None
+
+
+
+
 
 def insert_butterfly(connection, butterfly_data):
     cursor = connection.cursor()
@@ -121,6 +135,10 @@ def insert_butterfly(connection, butterfly_data):
     connection.commit()
     print("Butterfly data inserted successfully!")
     cursor.close()
+
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     connection = mysql.connector.connect(
