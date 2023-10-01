@@ -1,6 +1,8 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
 import pandas as pd
+
 
 #PREPROCESSSING------------------------------------------------------------------------------------------------------------------------------
 def split_name_from_scientific_name(full_name):
@@ -8,12 +10,8 @@ def split_name_from_scientific_name(full_name):
     name = parts[0]
     scientific_name = parts[1].rstrip(")") if len(parts) > 1 else ""
     return name, scientific_name
-
-def remove_pipe_bar(text):
-    # Split by pipe, get the first part (before pipe) and strip any leading/trailing whitespace
-    return text.split("|")[0].strip()
-
 #--------------------------------------------------------------------------------------------------------------------------------------------
+
 def get_family_subfamily_joint():
     driver = webdriver.Chrome()
     url = "https://coloradofrontrangebutterflies.com/butterfly-families"
@@ -71,62 +69,88 @@ def get_family_subfamily_joint():
 
     return subfamilies_df
 
-    
 
-#this will aquire all the base information for the butterfly and create a subfamily to buttefly data frame
 def get_base_butterfly(subfamilies_df):
-    # Initialize a new Chrome WebDriver instance
-    driver = webdriver.Chrome()
+    """
+    Acquire all the base information for the butterfly and create a subfamily to butterfly data frame.
 
-    # Go to the target URL
-    url = "http://coloradofrontrangebutterflies.com/butterfly-families/"
+    Parameters:
+    - subfamilies_df (DataFrame): A dataframe containing subfamilies and their associated IDs.
+
+    Returns:
+    - butterflies_df (DataFrame): A dataframe containing butterfly names and their links.
+    - joint_df (DataFrame): A dataframe linking subfamilies to butterflies.
+    """
+    
+    driver = webdriver.Chrome()
+    url = "https://coloradofrontrangebutterflies.com/butterfly-families"
     driver.get(url)
 
-    butterfly_names = []
-    subfamily_ids = []
+    # Retrieve the entire page source
+    page_source = driver.page_source
 
-    # Iterate over the range for all the subfamilies (from 2 to 18 inclusive)
-    for i in range(2, 19):
-        try:
-            # Find the container that includes the butterfly information
-            container = driver.find_element(By.CLASS_NAME, f"et_pb_section_{i}et_section_regular")
-
-            # Extract butterflies
-            inner_texts = container.find_elements(By.CLASS_NAME, "et_pb_text_inner")
-            for inner_text in inner_texts:
-                name = remove_pipe_bar(inner_text.text)
-                butterfly_names.append(name)
-                
-                # Get the subfamily ID based on index (i-2 because range starts from 2)
-                subfamily_id = subfamilies_df.iloc[i-2]['Subfamily ID']
-                subfamily_ids.append(subfamily_id)
-
-        except Exception as e:
-            print(f"Error while processing subfamily index {i}: {e}")
-    
+    # Close the Selenium browser
     driver.quit()
 
-    # Create DataFrame for the base butterfly information
-    butterflies_df = pd.DataFrame({
-        'Butterfly Name': butterfly_names,
-        'Subfamily ID': subfamily_ids
-    })
+    # Parse the page source with BeautifulSoup
+    soup = BeautifulSoup(page_source, 'html.parser')
 
-    # Create the many-to-many joint table
-    joint_df = butterflies_df[['Subfamily ID', 'Butterfly Name']]
+    butterflies_data = []
+    joint_data = []
+
+    for i in range(2, 19):  # Loop from section 2 to section 18
+        section_class = f"et_pb_section et_pb_section_{i} et_section_regular"
+        if(i == 3):
+            section_class = f"et_pb_section et_pb_section_3 famthumb et_section_regular"
+        section = soup.find("div", class_=section_class)
+
+        
+        # Extract subfamily name
+        subfamily_name = section.find("div", class_="et_pb_text_inner").get_text(strip=True).split('|')[0].split(' Family')[0].strip()
+        
+        if(subfamily_name == 'Fritillaries'):
+            subfamily_name = 'Milkweed Butterflies'
+
+        # Get subfamily_id from the dataframe
+        subfamily_id = subfamilies_df[subfamilies_df['subfamily_name'] == subfamily_name]['id'].values[0]
+
+        # Loop over rows in the section
+        for row in section.find_all("div", class_="et_pb_row"):
+            
+            # Loop over columns in the row
+            for column in row.find_all("div", class_="et_pb_column"):
+                
+                # Check if the column has both an image and a text div
+                image_div = column.find("div", class_="et_pb_image")
+                butterfly_div = column.find("div", class_="et_pb_text")
+                
+                if image_div and butterfly_div:
+                    a_tag = butterfly_div.find("a")
+                    if a_tag:
+                        butterfly_name = a_tag.get_text(strip=True)
+                        butterfly_link = a_tag['href']
+                        
+                        # Append to butterflies data and joint data
+                        butterflies_data.append({
+                            'name': butterfly_name,
+                            'link': butterfly_link
+                        })
+                        # Assuming butterfly_id is the index of this butterfly in butterflies_data
+                        butterfly_id = len(butterflies_data)
+                        joint_data.append({
+                            'subfamily_id': subfamily_id,
+                            'butterfly_id': butterfly_id
+                        })
+
+    # Convert to dataframes
+    butterflies_df = pd.DataFrame(butterflies_data)
+    joint_df = pd.DataFrame(joint_data)
 
     return butterflies_df, joint_df
-
-
-
-
-
-
 
 subfamilies_df = get_family_subfamily_joint()
 butterflies_df, joint_df = get_base_butterfly(subfamilies_df)
 print("Butterflies Data:")
 print(butterflies_df)
-
 print("\nJoint Table Data:")
 print(joint_df)
