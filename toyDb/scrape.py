@@ -1,8 +1,12 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
+from selenium.webdriver.chrome.options import Options
 import pandas as pd
 
+
+chrome_options = Options()
+chrome_options.add_argument("--headless")
 
 #PREPROCESSSING------------------------------------------------------------------------------------------------------------------------------
 def split_name_from_scientific_name(full_name):
@@ -12,8 +16,10 @@ def split_name_from_scientific_name(full_name):
     return name, scientific_name
 #--------------------------------------------------------------------------------------------------------------------------------------------
 
+#SECTION 1 - PROCESS: FAMILY TABLE, SUBFAMILY TABLE, FAMILY_TO_SUBFAMILY
 def get_family_subfamily_joint():
-    driver = webdriver.Chrome()
+    
+    driver = webdriver.Chrome(options=chrome_options)
     url = "https://coloradofrontrangebutterflies.com/butterfly-families"
     driver.get(url)
 
@@ -68,8 +74,9 @@ def get_family_subfamily_joint():
     print(mapping_df)
 
     return subfamilies_df
+#--------------------------------------------------------------------------------------------------------------------------------------------
 
-
+#SECTION 2 - PROCESS: BASIC INFORMATION ABOUT BUTTERFLY(NAME, LINK), USE SUBHEADING TO ASSOCIATE BUTTERFLY TO SUBFAMILY 
 def get_base_butterfly(subfamilies_df):
     """
     Acquire all the base information for the butterfly and create a subfamily to butterfly data frame.
@@ -82,7 +89,7 @@ def get_base_butterfly(subfamilies_df):
     - joint_df (DataFrame): A dataframe linking subfamilies to butterflies.
     """
     
-    driver = webdriver.Chrome()
+    driver = webdriver.Chrome(options=chrome_options)
     url = "https://coloradofrontrangebutterflies.com/butterfly-families"
     driver.get(url)
 
@@ -154,3 +161,20 @@ print("Butterflies Data:")
 print(butterflies_df)
 print("\nJoint Table Data:")
 print(joint_df)
+#--------------------------------------------------------------------------------------------------------------------------------------------
+
+#SECTION 3 - PROCESS: BUTTERFLY DETAILS
+def get_butterfly_details(butterflies_df):
+    # Assuming the dataframe contains a column named 'link' with the URLs
+    html_sources = []
+
+    # Using context manager to ensure driver closes after operations
+    with webdriver.Chrome() as driver:
+        for index, row in butterflies_df.iterrows():
+            url = row['link']
+            driver.get(url)
+
+            # Get the page's HTML source and store in list
+            html_sources.append(driver.page_source)
+
+    return html_sources
