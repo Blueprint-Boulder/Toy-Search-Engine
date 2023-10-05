@@ -3,7 +3,6 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 import pandas as pd
 
-
 #PREPROCESSSING------------------------------------------------------------------------------------------------------------------------------
 def split_name_from_scientific_name(full_name):
     parts = full_name.split(" (")
@@ -12,6 +11,9 @@ def split_name_from_scientific_name(full_name):
     return name, scientific_name
 #--------------------------------------------------------------------------------------------------------------------------------------------
 
+#SECTION 1 - PROCESS: FAMILY TABLE, SUBFAMILY TABLE, FAMILY_TO_SUBFAMILY
+
+#DATA FRAME CONSTRUCTION---------------------------------------------------------------------------------------------------------------------
 def get_family_subfamily_joint():
     driver = webdriver.Chrome()
     url = "https://coloradofrontrangebutterflies.com/butterfly-families"
@@ -86,6 +88,7 @@ def get_base_butterfly(subfamilies_df):
     url = "https://coloradofrontrangebutterflies.com/butterfly-families"
     driver.get(url)
 
+
     # Retrieve the entire page source
     page_source = driver.page_source
 
@@ -97,6 +100,8 @@ def get_base_butterfly(subfamilies_df):
 
     butterflies_data = []
     joint_data = []
+
+    butterfly_id = 1
 
     for i in range(2, 19):  # Loop from section 2 to section 18
         section_class = f"et_pb_section et_pb_section_{i} et_section_regular"
@@ -132,25 +137,52 @@ def get_base_butterfly(subfamilies_df):
                         
                         # Append to butterflies data and joint data
                         butterflies_data.append({
+                            'id': butterfly_id,
                             'name': butterfly_name,
                             'link': butterfly_link
                         })
                         # Assuming butterfly_id is the index of this butterfly in butterflies_data
                         butterfly_id = len(butterflies_data)
                         joint_data.append({
+                            'id': butterfly_id,
                             'subfamily_id': subfamily_id,
                             'butterfly_id': butterfly_id
                         })
+                        butterfly_id+=1
 
     # Convert to dataframes
     butterflies_df = pd.DataFrame(butterflies_data)
     joint_df = pd.DataFrame(joint_data)
 
     return butterflies_df, joint_df
+#--------------------------------------------------------------------------------------------------------------------------------------------
 
+#DATA FRAME EDITING--------------------------------------------------------------------------------------------------------------------------
+def get_butterfly_attributes(butterflies_df):
+    pass
+#--------------------------------------------------------------------------------------------------------------------------------------------
 subfamilies_df = get_family_subfamily_joint()
 butterflies_df, joint_df = get_base_butterfly(subfamilies_df)
 print("Butterflies Data:")
 print(butterflies_df)
 print("\nJoint Table Data:")
 print(joint_df)
+print(joint_df)
+#--------------------------------------------------------------------------------------------------------------------------------------------
+
+#SECTION 3 - PROCESS: BUTTERFLY DETAILS
+def get_butterfly_details(butterflies_df):
+    # Assuming the dataframe contains a column named 'link' with the URLs
+    html_sources = []
+
+    # Using context manager to ensure driver closes after operations
+    with webdriver.Chrome() as driver:
+        for index, row in butterflies_df.iterrows():
+            url = row['link']
+            driver.get(url)
+
+            # Get the page's HTML source and store in list
+            html_sources.append(driver.page_source)
+
+    return html_sources
+get_butterfly_attributes(butterflies_df)
