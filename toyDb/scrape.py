@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from selenium.webdriver.chrome.options import Options
 import pandas as pd
+import re
 
 
 chrome_options = Options()
@@ -170,22 +171,38 @@ print(joint_df)
 
 #SECTION 3 - EDIT BUTTERFLIES DATA FRAME
 #--------------------------------------------------------------------------------------------------------------------------------------------
+def fix_link(butterflies_df,id_num):
+    new_link = butterflies_df.loc[id_num,'name']
+    new_link = new_link.lower()
+    new_link = new_link.replace(" ","-")
+    new_link = f"https://coloradofrontrangebutterflies.com/{new_link}"
+    butterflies_df.at[id_num, 'link'] = new_link
+    return new_link
+
 def get_butterfly_details(butterflies_df):
+
     butterflies_df['scientific_name'] = ""
+    butterflies_df['appearance'] = ""
+    butterflies_df['wingspan'] = ""
+    butterflies_df['habitat'] = ""
+    butterflies_df['flight times'] = ""
+    butterflies_df['larval foodplant'] = ""
+    butterflies_df['did you know'] = ""
+
+    butterfly_labels = ["Appearance","Wingspan","Habitat","Flight Times","Larval Foodplant","Did You Know"]
+
     driver = webdriver.Chrome(options=chrome_options)
     id_num = 0
+
     for url in butterflies_df['link']:
+
         driver.get(url)
         stupidSoup = BeautifulSoup(driver.page_source,'html.parser')
         science_name = stupidSoup.find('em')
+
         if(not science_name):
-            new_link = butterflies_df.loc[id_num,'name']
-            new_link = new_link.lower()
-            new_link = new_link.replace(" ","-")
-            new_link = f"https://coloradofrontrangebutterflies.com/{new_link}"
-            butterflies_df.at[id_num, 'link'] = new_link
-            test_name = butterflies_df.loc[id_num, 'name']
-            test = butterflies_df.loc[id_num, 'link']
+
+            new_link = fix_link(butterflies_df,id_num)
             driver.get(new_link)
             stupidSoup = BeautifulSoup(driver.page_source,'html.parser')
             science_name = stupidSoup.find('em')
@@ -193,6 +210,22 @@ def get_butterfly_details(butterflies_df):
         science_name = science_name.get_text()
         science_name = science_name[1:-1]
         butterflies_df.loc[id_num,'scientific_name'] = science_name
+
+        for i in range(0,6):
+            pattern = re.compile(f'{butterfly_labels[i]}|Season', re.IGNORECASE)
+            #detail = stupidSoup.select_one(f'b:contains("{butterfly_labels[i]}")')
+            detail = stupidSoup.find('b',text=pattern)
+            test_for_paragraph = detail.find_parent('p')
+            if test_for_paragraph:
+                detail = detail.find_parent('p')
+                text = detail.get_text()
+                text = text.replace(detail.find('b').get_text(), '')
+            else:
+                text = detail.next_sibling.strip()
+            
+            butterflies_df.loc[id_num,butterfly_labels[i].lower()] = text
+            i+=1
+        
         id_num+=1
 
         
