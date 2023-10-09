@@ -16,7 +16,6 @@ def split_name_from_scientific_name(full_name):
     scientific_name = parts[1].rstrip(")") if len(parts) > 1 else ""
     return name, scientific_name
 #--------------------------------------------------------------------------------------------------------------------------------------------
-
 #SECTION 1 - PROCESS: FAMILY TABLE, SUBFAMILY TABLE, FAMILY_TO_SUBFAMILY
 def get_family_subfamily_joint():
     
@@ -76,7 +75,6 @@ def get_family_subfamily_joint():
 
     return subfamilies_df
 #--------------------------------------------------------------------------------------------------------------------------------------------
-
 #SECTION 2 - PROCESS: BASIC INFORMATION ABOUT BUTTERFLY(NAME, LINK), USE SUBHEADING TO ASSOCIATE BUTTERFLY TO SUBFAMILY 
 def get_base_butterfly(subfamilies_df):
     """
@@ -168,9 +166,7 @@ print(butterflies_df)
 print("\nJoint Table Data:")
 print(joint_df)
 #--------------------------------------------------------------------------------------------------------------------------------------------
-
 #SECTION 3 - EDIT BUTTERFLIES DATA FRAME
-#--------------------------------------------------------------------------------------------------------------------------------------------
 def fix_link(butterflies_df,id_num):
     new_link = butterflies_df.loc[id_num,'name']
     new_link = new_link.lower()
@@ -233,4 +229,3 @@ def get_butterfly_details(butterflies_df):
 
 get_butterfly_details(butterflies_df)
 print(butterflies_df)
-#--------------------------------------------------------------------------------------------------------------------------------------------
