@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from selenium.webdriver.chrome.options import Options
 import pandas as pd
+import re
 
 
 chrome_options = Options()
@@ -15,7 +16,6 @@ def split_name_from_scientific_name(full_name):
     scientific_name = parts[1].rstrip(")") if len(parts) > 1 else ""
     return name, scientific_name
 #--------------------------------------------------------------------------------------------------------------------------------------------
-
 #SECTION 1 - PROCESS: FAMILY TABLE, SUBFAMILY TABLE, FAMILY_TO_SUBFAMILY
 def get_family_subfamily_joint():
     
@@ -75,7 +75,6 @@ def get_family_subfamily_joint():
 
     return subfamilies_df
 #--------------------------------------------------------------------------------------------------------------------------------------------
-
 #SECTION 2 - PROCESS: BASIC INFORMATION ABOUT BUTTERFLY(NAME, LINK), USE SUBHEADING TO ASSOCIATE BUTTERFLY TO SUBFAMILY 
 def get_base_butterfly(subfamilies_df):
     """
@@ -104,6 +103,8 @@ def get_base_butterfly(subfamilies_df):
 
     butterflies_data = []
     joint_data = []
+
+    butterfly_id = 1
 
     for i in range(2, 19):  # Loop from section 2 to section 18
         section_class = f"et_pb_section et_pb_section_{i} et_section_regular"
@@ -139,15 +140,18 @@ def get_base_butterfly(subfamilies_df):
                         
                         # Append to butterflies data and joint data
                         butterflies_data.append({
+                            'id': butterfly_id,
                             'name': butterfly_name,
                             'link': butterfly_link
                         })
                         # Assuming butterfly_id is the index of this butterfly in butterflies_data
                         butterfly_id = len(butterflies_data)
                         joint_data.append({
+                            'id': butterfly_id,
                             'subfamily_id': subfamily_id,
                             'butterfly_id': butterfly_id
                         })
+                        butterfly_id+=1
 
     # Convert to dataframes
     butterflies_df = pd.DataFrame(butterflies_data)
@@ -162,19 +166,66 @@ print(butterflies_df)
 print("\nJoint Table Data:")
 print(joint_df)
 #--------------------------------------------------------------------------------------------------------------------------------------------
+#SECTION 3 - EDIT BUTTERFLIES DATA FRAME
+def fix_link(butterflies_df,id_num):
+    new_link = butterflies_df.loc[id_num,'name']
+    new_link = new_link.lower()
+    new_link = new_link.replace(" ","-")
+    new_link = f"https://coloradofrontrangebutterflies.com/{new_link}"
+    butterflies_df.at[id_num, 'link'] = new_link
+    return new_link
 
-#SECTION 3 - PROCESS: BUTTERFLY DETAILS
 def get_butterfly_details(butterflies_df):
-    # Assuming the dataframe contains a column named 'link' with the URLs
-    html_sources = []
 
-    # Using context manager to ensure driver closes after operations
-    with webdriver.Chrome() as driver:
-        for index, row in butterflies_df.iterrows():
-            url = row['link']
-            driver.get(url)
+    butterflies_df['scientific_name'] = ""
+    butterflies_df['appearance'] = ""
+    butterflies_df['wingspan'] = ""
+    butterflies_df['habitat'] = ""
+    butterflies_df['flight times'] = ""
+    butterflies_df['larval foodplant'] = ""
+    butterflies_df['did you know'] = ""
 
-            # Get the page's HTML source and store in list
-            html_sources.append(driver.page_source)
+    butterfly_labels = ["Appearance","Wingspan","Habitat","Flight Times","Larval Foodplant","Did You Know"]
 
-    return html_sources
+    driver = webdriver.Chrome(options=chrome_options)
+    id_num = 0
+
+    for url in butterflies_df['link']:
+
+        driver.get(url)
+        stupidSoup = BeautifulSoup(driver.page_source,'html.parser')
+        science_name = stupidSoup.find('em')
+
+        if(not science_name):
+
+            new_link = fix_link(butterflies_df,id_num)
+            driver.get(new_link)
+            stupidSoup = BeautifulSoup(driver.page_source,'html.parser')
+            science_name = stupidSoup.find('em')
+            
+        science_name = science_name.get_text()
+        science_name = science_name[1:-1]
+        butterflies_df.loc[id_num,'scientific_name'] = science_name
+
+        for i in range(0,6):
+            pattern = re.compile(f'{butterfly_labels[i]}|Season', re.IGNORECASE)
+            #detail = stupidSoup.select_one(f'b:contains("{butterfly_labels[i]}")')
+            detail = stupidSoup.find('b',text=pattern)
+            test_for_paragraph = detail.find_parent('p')
+            if test_for_paragraph:
+                detail = detail.find_parent('p')
+                text = detail.get_text()
+                text = text.replace(detail.find('b').get_text(), '')
+            else:
+                text = detail.next_sibling.strip()
+            
+            butterflies_df.loc[id_num,butterfly_labels[i].lower()] = text
+            i+=1
+        
+        id_num+=1
+
+        
+    driver.close()
+
+get_butterfly_details(butterflies_df)
+print(butterflies_df)
