@@ -2,7 +2,11 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from selenium.webdriver.chrome.options import Options
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 import pandas as pd
+import mysql.connector
+import os
 import re
 
 
@@ -66,14 +70,7 @@ def get_family_subfamily_joint():
     subfamilies_df = pd.DataFrame(subfamilies)
     mapping_df = pd.DataFrame(family_to_subfamily)
 
-    print("Families:")
-    print(families_df)
-    print("\nSubfamilies:")
-    print(subfamilies_df)
-    print("\nFamily to Subfamily Mapping:")
-    print(mapping_df)
-
-    return subfamilies_df
+    return subfamilies_df, mapping_df, families_df
 #--------------------------------------------------------------------------------------------------------------------------------------------
 #SECTION 2 - PROCESS: BASIC INFORMATION ABOUT BUTTERFLY(NAME, LINK), USE SUBHEADING TO ASSOCIATE BUTTERFLY TO SUBFAMILY 
 def get_base_butterfly(subfamilies_df):
@@ -159,12 +156,9 @@ def get_base_butterfly(subfamilies_df):
 
     return butterflies_df, joint_df
 
-subfamilies_df = get_family_subfamily_joint()
+subfamilies_df, mapping_df, families_df = get_family_subfamily_joint()
 butterflies_df, joint_df = get_base_butterfly(subfamilies_df)
-print("Butterflies Data:")
-print(butterflies_df)
-print("\nJoint Table Data:")
-print(joint_df)
+
 #--------------------------------------------------------------------------------------------------------------------------------------------
 #SECTION 3 - EDIT BUTTERFLIES DATA FRAME
 def fix_link(butterflies_df,id_num):
@@ -224,8 +218,126 @@ def get_butterfly_details(butterflies_df):
         
         id_num+=1
 
-        
+     
     driver.close()
+    butterflies_df = butterflies_df.rename(columns={
+        'flight times': 'flight_times',
+        'larval foodplant': 'larval_foodplant',
+        'did you know': 'did_you_know'
+    })
 
-get_butterfly_details(butterflies_df)
-print(butterflies_df)
+    return butterflies_df;  
+
+butterflies_df = get_butterfly_details(butterflies_df)
+
+
+#DATABSE CREATION---------------------------------------------------------------------------------------------------------------------------
+# Load environment variables
+load_dotenv()
+
+DB_USERNAME = os.getenv("DB_USERNAME")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DATABASE = os.getenv("DB_DATABASE")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+
+initial_connection = mysql.connector.connect(
+    user=DB_USERNAME,
+    password=DB_PASSWORD,
+    host=DB_HOST,
+    port=DB_PORT
+)
+cursor = initial_connection.cursor()
+cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_DATABASE};")
+cursor.close()
+initial_connection.close()
+
+# Create MySQL connection
+connection = mysql.connector.connect(
+    user=os.getenv("DB_USERNAME"),
+    password=os.getenv("DB_PASSWORD"),
+    database=os.getenv("DB_DATABASE"),
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT")
+)
+
+# Define function to create tables
+def create_tables():
+    cursor = connection.cursor()
+
+    # Drop existing tables first to ensure a fresh start
+    cursor.execute("DROP TABLE IF EXISTS Subfamily_to_Butterflies;")
+    cursor.execute("DROP TABLE IF EXISTS Family_to_Subfamily;")
+    cursor.execute("DROP TABLE IF EXISTS Butterflies;")
+    cursor.execute("DROP TABLE IF EXISTS Subfamilies;")
+    cursor.execute("DROP TABLE IF EXISTS Families;")
+
+    # Create Families table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Families (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        family_name VARCHAR(255),
+        scientific_family_name VARCHAR(255)
+    );
+    """)
+
+    # Create Subfamilies table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Subfamilies (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subfamily_name VARCHAR(255),
+        scientific_subfamily_name VARCHAR(255)
+    );
+    """)
+
+    # Create Family to Subfamily Mapping table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Family_to_Subfamily (
+        family_id INT,
+        subfamily_id INT,
+        FOREIGN KEY (family_id) REFERENCES Families(id),
+        FOREIGN KEY (subfamily_id) REFERENCES Subfamilies(id)
+    );
+    """)
+
+    # Create Butterflies table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Butterflies (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255),
+        link VARCHAR(255),
+        scientific_name VARCHAR(255),
+        appearance TEXT,
+        wingspan VARCHAR(255),
+        habitat TEXT,
+        flight_times TEXT,
+        larval_foodplant TEXT,
+        did_you_know TEXT
+    );
+    """)
+
+    # Create Joint table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Subfamily_to_Butterflies (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subfamily_id INT,
+        butterfly_id INT,
+        FOREIGN KEY (subfamily_id) REFERENCES Subfamilies(id),
+        FOREIGN KEY (butterfly_id) REFERENCES Butterflies(id)
+    );
+    """)
+
+    cursor.close()
+
+create_tables()
+
+# SQLAlchemy engine connection
+engine = create_engine(f"mysql+mysqlconnector://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_DATABASE}")
+
+# Write dataframes to SQL
+families_df.to_sql(name='Families', con=engine, if_exists='append', index=False)
+subfamilies_df.to_sql(name='Subfamilies', con=engine, if_exists='append', index=False)
+mapping_df.to_sql(name='Family_to_Subfamily', con=engine, if_exists='append', index=False)
+butterflies_df.to_sql(name='Butterflies', con=engine, if_exists='append', index=False)
+joint_df.to_sql(name='Subfamily_to_Butterflies', con=engine, if_exists='append', index=False)
+print("SUCCESS!")
